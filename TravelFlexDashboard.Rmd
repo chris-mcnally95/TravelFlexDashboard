@@ -1,0 +1,179 @@
+---
+title: "International Travel COVID-19 Report `r format(Sys.Date(), '%d-%m-%Y')`"
+output: 
+  flexdashboard::flex_dashboard:
+    theme:
+      navbar-bg: "#003049"
+    orientation: rows
+    vertical_layout: fill
+---
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(dplyr)
+library(dbplyr)
+```
+
+```{r source scripts, include=FALSE}
+source("./data_prep.R")
+```
+
+```{r include=FALSE}
+# Total
+totalcasesall <- format(nrow(Allcases %>%
+                                dplyr::filter(EpiweekCreated != current.epiweek)), big.mark = ",")
+                          
+
+totalcasessucc <- format(nrow(Allcases %>%
+                                dplyr::filter(EpiweekCreated != current.epiweek,
+                                              CaseFileStatus != "Cancelled")),
+                         big.mark = ",")
+                              
+totalCTAtravellercases <- format(nrow(travellers %>%
+                                     dplyr::filter(EpiweekCreated != current.epiweek,
+                                                   CountriesVisited %in% CTA)),
+                              big.mark = ",")
+
+totalINTtravellercases <- format(nrow(travellers %>%
+                                     dplyr::filter(EpiweekCreated != current.epiweek,
+                                                   !CountriesVisited %in% CTA)),
+                              big.mark = ",")
+                            
+
+totalpercentage <- paste0(round((nrow(travellers %>%
+                                        dplyr::filter(EpiweekCreated != current.epiweek))/
+                                   nrow(Allcases %>%
+                                          dplyr::filter(EpiweekCreated != current.epiweek)))*100, 2), "%")
+
+totalpercentagesucc <- paste0(round((nrow(travellers)/
+                                       nrow(Allcases %>%
+                                              dplyr::filter(EpiweekCreated != current.epiweek,
+                                                            CaseFileStatus != "Cancelled")))*100, 2), "%")
+
+# Fortnight
+FortCasesAll <- nrow(rbind(Allcases %>% 
+                       dplyr::filter(EpiweekCreated == previous.epiweek), 
+                       Allcases %>% 
+                       dplyr::filter(EpiweekCreated == two.epiweeks.ago)))
+  
+FortCasesAllSucc <- nrow(rbind(Allcases %>% 
+                       dplyr::filter(EpiweekCreated == previous.epiweek,
+                              CaseFileStatus != "Cancelled"), 
+                       Allcases %>% 
+                       dplyr::filter(EpiweekCreated == two.epiweeks.ago,
+                              CaseFileStatus != "Cancelled")))
+
+FortTravellersAll <- nrow(rbind(travellers %>% 
+                         dplyr::filter(EpiweekCreated == previous.epiweek), 
+                         travellers %>%
+                           dplyr::filter(EpiweekCreated == two.epiweeks.ago)))
+
+FortCTATravellers <- nrow(rbind(travellers %>% 
+                         dplyr::filter(EpiweekCreated == previous.epiweek,
+                                       CountriesVisited %in% CTA), 
+                         travellers %>%
+                           dplyr::filter(EpiweekCreated == two.epiweeks.ago,
+                                         CountriesVisited %in% CTA)))
+
+FortINTTravellers <- nrow(rbind(travellers %>% 
+                         dplyr::filter(EpiweekCreated == previous.epiweek,
+                                       !CountriesVisited %in% CTA), 
+                         travellers %>%
+                           dplyr::filter(EpiweekCreated == two.epiweeks.ago,
+                                         !CountriesVisited %in% CTA)))
+
+fortpercentage <- paste0(
+  round(FortTravellersAll/
+        FortCasesAll*100, 2), "%")
+
+fortpercentagesucc <- paste0(
+  round(FortTravellersAll/
+        FortCasesAllSucc*100, 2), "%")
+
+FortCasesAll <- format(FortCasesAll, big.mark = ",")
+FortCasesAllSucc <- format(FortCasesAllSucc, big.mark = ",")
+FortCTATravellers <- format(FortCTATravellers, big.mark = ",")
+FortINTTravellers <- format(FortINTTravellers, big.mark = ",")
+
+```
+
+# Fortnightly Report
+
+Welcome to the Travel Report for COVID-19 cases associated with international travel within Northern Ireland.
+This report is a summary of a dashboard that has been built to aid the CTC Data Management Team / Surveillance Team to monitor COVID-19 cases related to international travel.
+Furthermore, as of the 5th of November 2021, there are no countries on the red-list and as such, all countries are treated equal. Total cases refers to all cases since records began in March 2020. Successful cases refers to those who were successfully contact traced. Two weeks refers to all cases from Monday 00:00 on `r format(lubridate::floor_date(lubridate::today()-13, "week")+1, "%d-%m-%Y")` to the most recent Sunday 23:59.
+
+Row 
+--------------------------------------
+
+### 
+```{r}
+flexdashboard::valueBox(value = totalcasesall,
+                        caption = paste("Total Reported Cases as of ", format(Sys.Date()-1, "%d-%m-%Y"), "Successful cases: ", totalcasessucc),
+                        icon = "ion-android-clipboard", 
+                        color ="royalblue")
+```
+
+### 
+```{r}
+flexdashboard::valueBox(value = FortCasesAll,
+                        caption = paste("Reported Cases Within Last Two Weeks. Successful cases: ", FortCasesAllSucc),
+                        icon = "ion-android-clipboard", 
+                        color ="royalblue")
+```
+
+Row 
+--------------------------------------
+
+### 
+```{r}
+flexdashboard::valueBox(value = totalCTAtravellercases,
+                        caption = paste("Total Reported Cases from Travellers within the CTA as of ", format(Sys.Date()-1, "%d-%m-%Y")),
+                        icon = "ion-android-plane", 
+                        color ="grey")
+```
+
+### 
+```{r}
+flexdashboard::valueBox(value = FortCTATravellers,
+                        caption = paste("Reported Cases from Travellers Within the CTA in the Previous Two Epiweeks"),
+                        icon = "ion-android-plane", 
+                        color ="grey")
+``` 
+
+Row 
+--------------------------------------
+
+### 
+```{r}
+flexdashboard::valueBox(value = totalINTtravellercases,
+                        caption = paste("Total Reported Cases from International Travellers as of ", format(Sys.Date()-1, "%d-%m-%Y")),
+                        icon = "ion-android-plane", 
+                        color ="cornflowerblue")
+```
+
+### 
+```{r}
+flexdashboard::valueBox(value = FortINTTravellers,
+                        caption = paste("Reported Cases from International Travellers in the Previous Two Epiweeks"),
+                        icon = "ion-android-plane", 
+                        color ="cornflowerblue")
+``` 
+
+Row 
+--------------------------------------
+
+### 
+```{r}
+flexdashboard::valueBox(value = totalpercentagesucc,
+                        caption = paste("Percentage of Total Cases that Travelled Outside NI Based on Successful Cases"),
+                        icon = "ion-podium", 
+                        color ="slategray")
+```
+
+### 
+```{r}
+flexdashboard::valueBox(value = fortpercentagesucc,
+                        caption = paste("Percentage of Cases that Travelled Outside NI Based on Successful Cases in the Previous Two Epiweeks"),
+                        icon = "ion-podium", 
+                        color = "slategray")
+```
