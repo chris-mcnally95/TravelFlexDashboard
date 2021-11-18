@@ -815,10 +815,73 @@ travellers$CountriesVisited <- gsub("Irelandl|Ireland Lives in Donegal", "ROI", 
 travellers$CountriesVisited <- gsub("Mali France", "France", travellers$CountriesVisited)
 travellers$CountriesVisited <- gsub("Ireland", "ROI", travellers$CountriesVisited)
 travellers$CountriesVisited <- gsub("United States", "USA", travellers$CountriesVisited)
+
 #### Tidy End ####
 
+# Assign Country Bins 
+europe.other <- c("Albania",
+                  "Andorra",
+                  "Armenia",
+                  "Austria",
+                  "Azerbaijan",
+                  "Belarus",
+                  "Belgium",
+                  "Bosnia and Herzegovina",
+                  "Bulgaria",
+                  "Croatia",
+                  "Cyprus",
+                  "Czechia",
+                  "Denmark",
+                  "Estonia",
+                  "Finland",
+                  "France",
+                  "Georgia",
+                  "Germany",
+                  "Greece",
+                  "Hungary",
+                  "Iceland",
+                  "Italy",
+                  "Kazakhstan",
+                  "Kosovo",
+                  "Latvia",
+                  "Liechtenstein",
+                  "Lithuania",
+                  "Luxembourg",
+                  "Malta",
+                  "Moldova",
+                  "Monaco",
+                  "Montenegro",
+                  "Netherlands",
+                  "North Macedonia",
+                  "Norway",
+                  "Poland",
+                  "Portugal",
+                  "Romania",
+                  "Russia",
+                  "San Marino",
+                  "Serbia",
+                  "Slovakia",
+                  "Slovenia",
+                  "Sweden",
+                  "Switzerland",
+                  "Turkey",
+                  "Ukraine",
+                  "Vatican City")
+
+`%!in%` <- Negate(`%in%`) # Define not in 
+
 # Assign Common Travel Area
-CTA <- as.vector(c("England", "Scotland", "Wales", "Isle of Man", "Guernsey", "Jersey", "ROI")) 
+CTA <- as.vector(c("England", "Scotland", "Wales", "Isle of Man", "Guernsey", "Jersey", "ROI"))
+
+# Create Groups
+travellers <- travellers %>% 
+    dplyr::mutate(CountryGroup = dplyr::case_when(CountriesVisited == "ROI" ~ "ROI",
+                                                  CountriesVisited == "England" ~ "England",
+                                                  CountriesVisited == "Scotland" ~ "Scotland",
+                                                  CountriesVisited == "Wales" ~ "Wales",
+                                                  CountriesVisited == "Spain" ~ "Spain",
+                                                  CountriesVisited %in% europe.other ~ "Europe Other",
+                                                  CountriesVisited != c("ROI", "England", "Scotland", "Wales", "Spain") & CountriesVisited %!in% europe.other ~ "Outside Europe")) 
 
 # End Script
 DBI::dbDisconnect(con)
@@ -826,29 +889,39 @@ DBI::dbDisconnect(con)
 
 ```{r include=FALSE}
 # Total
-totalcasesall <- format(nrow(Allcases %>%
-                                dplyr::filter(EpiweekCreated != current.epiweek)), big.mark = ",")
+totalcasesall <- nrow(Allcases %>%
+                        dplyr::filter(EpiweekCreated != current.epiweek))
+                                
                           
 
-totalcasessucc <- format(nrow(Allcases %>%
-                                dplyr::filter(EpiweekCreated != current.epiweek,
-                                              CaseFileStatus != "Cancelled")),
-                         big.mark = ",")
+totalcasessucc <- nrow(Allcases %>% 
+                         dplyr::filter(EpiweekCreated != current.epiweek,
+                                              CaseFileStatus != "Cancelled"))
+                                
+totaltravellercases <- nrow(travellers %>%
+                              dplyr::filter(EpiweekCreated != current.epiweek))
+                                     
                               
-totalCTAtravellercases <- format(nrow(travellers %>%
-                                     dplyr::filter(EpiweekCreated != current.epiweek,
-                                                   CountriesVisited %in% CTA)),
-                              big.mark = ",")
+totalCTAtravellercases <- nrow(travellers %>% 
+                                 dplyr::filter(EpiweekCreated != current.epiweek,
+                                                   CountriesVisited %in% CTA))
+                                     
+totalINTtravellercases <- nrow(travellers %>% 
+                                 dplyr::filter(EpiweekCreated != current.epiweek,
+                                                   !CountriesVisited %in% CTA))
 
-totalINTtravellercases <- format(nrow(travellers %>%
-                                     dplyr::filter(EpiweekCreated != current.epiweek,
-                                                   !CountriesVisited %in% CTA)),
-                              big.mark = ",")
+totalNontravellercases <- totalcasessucc - totaltravellercases
 
 totalpercentagesucc <- paste0(round((nrow(travellers)/
                                        nrow(Allcases %>%
                                               dplyr::filter(EpiweekCreated != current.epiweek,
                                                             CaseFileStatus != "Cancelled")))*100, 2), "%")
+
+totalcasesall <- format(totalcasesall, big.mark = ",")
+totalcasessucc <- format(totalcasessucc, big.mark = ",")
+totalCTAtravellercases <- format(totalCTAtravellercases, big.mark = ",")
+totalINTtravellercases <- format(totalINTtravellercases, big.mark = ",")
+totalNontravellercases <- format(totalNontravellercases, big.mark = ",")
 
 # Fortnight
 FortCasesAll <- nrow(rbind(Allcases %>% 
@@ -882,6 +955,8 @@ FortINTTravellers <- nrow(rbind(travellers %>%
                            dplyr::filter(EpiweekCreated == two.epiweeks.ago,
                                          !CountriesVisited %in% CTA)))
 
+FortNonTravellers <- FortCasesAllSucc - FortTravellersAll
+
 fortpercentagesucc <- paste0(
   round(FortTravellersAll/
         FortCasesAllSucc*100, 2), "%")
@@ -890,6 +965,7 @@ FortCasesAll <- format(FortCasesAll, big.mark = ",")
 FortCasesAllSucc <- format(FortCasesAllSucc, big.mark = ",")
 FortCTATravellers <- format(FortCTATravellers, big.mark = ",")
 FortINTTravellers <- format(FortINTTravellers, big.mark = ",")
+FortNonTravellers <- format(FortNonTravellers, big.mark = ",")
 
 ```
 
@@ -897,7 +973,7 @@ FortINTTravellers <- format(FortINTTravellers, big.mark = ",")
 
 Welcome to the Travel Report for COVID-19 cases associated with international travel within Northern Ireland.
 This report is a summary of a dashboard that has been built to aid the CTC Data Management Team / Surveillance Team to monitor COVID-19 cases related to international travel.
-Furthermore, as of the 5th of November 2021, there are no countries on the red-list and as such, all countries are treated equal. Total cases refers to all cases since records began in March 2020. Successful cases refers to those who were successfully contact traced. Two weeks refers to all cases from Monday 00:00 on `r format(lubridate::floor_date(lubridate::today()-13, "week")+1, "%d-%m-%Y")` to the most recent Sunday 23:59.
+Furthermore, as of the 5th of November 2021, there are no countries on the red-list and as such, all countries are treated equally. The Common Travel Area (CTA) consists on ROI, Scotland, Wales, Isle of Man and the Channel Islands. Total cases refers to all cases since records began in March 2020. Successful cases refers to those who were successfully contact traced. Two epiweeks refers to all cases from Monday 00:00 on `r format(lubridate::floor_date(lubridate::today()-13, "week")+1, "%d-%m-%Y")` to the most recent Sunday 23:59.
 
 Row 
 --------------------------------------
@@ -907,15 +983,15 @@ Row
 flexdashboard::valueBox(value = totalcasesall,
                         caption = paste("Total Reported Cases as of ", format(Sys.Date()-1, "%d-%m-%Y"), "Successful cases: ", totalcasessucc),
                         icon = "ion-android-clipboard", 
-                        color ="royalblue")
+                        color ="cornflowerblue")
 ```
 
 ### 
 ```{r}
 flexdashboard::valueBox(value = FortCasesAll,
-                        caption = paste("Reported Cases Within Last Two Weeks. Successful cases: ", FortCasesAllSucc),
+                        caption = paste("Reported Cases Within Previous Two epiweeks. Successful cases: ", FortCasesAllSucc),
                         icon = "ion-android-clipboard", 
-                        color ="royalblue")
+                        color ="cornflowerblue")
 ```
 
 Row 
@@ -926,7 +1002,7 @@ Row
 flexdashboard::valueBox(value = totalCTAtravellercases,
                         caption = paste("Total Reported Cases from Travellers within the CTA as of ", format(Sys.Date()-1, "%d-%m-%Y")),
                         icon = "ion-android-plane", 
-                        color ="grey")
+                        color ="slategray")
 ```
 
 ### 
@@ -934,7 +1010,7 @@ flexdashboard::valueBox(value = totalCTAtravellercases,
 flexdashboard::valueBox(value = FortCTATravellers,
                         caption = paste("Reported Cases from Travellers Within the CTA in the Previous Two Epiweeks"),
                         icon = "ion-android-plane", 
-                        color ="grey")
+                        color ="slategray")
 ``` 
 
 Row 
@@ -973,4 +1049,137 @@ flexdashboard::valueBox(value = fortpercentagesucc,
                         caption = paste("Percentage of Cases that Travelled Outside NI Based on Successful Cases in the Previous Two Epiweeks"),
                         icon = "ion-podium", 
                         color = "slategray")
+```
+
+Row 
+--------------------------------------
+
+### 
+```{r}
+flexdashboard::valueBox(value = totalNontravellercases,
+                        caption = paste("Total Non-Travel Related Cases as of ", format(Sys.Date()-1, "%d-%m-%Y")),
+                        icon = "ion-document-text", 
+                        color ="cornflowerblue")
+```
+
+### 
+```{r}
+flexdashboard::valueBox(value = FortNonTravellers,
+                        caption = paste("Reported Non-Travel Related Cases in the Previous Two Epiweeks"),
+                        icon = "ion-document-text", 
+                        color ="cornflowerblue")
+``` 
+
+# Report Tables (Two Weeks)
+
+### All cases from Monday 00:00 on `r format(lubridate::floor_date(lubridate::today()-13, "week")+1, "%d-%m-%Y")` to the most recent Sunday 23:59.
+
+```{r}
+FortTravellersAllDF <- rbind(
+  travellers %>%
+    dplyr::filter(EpiweekCreated == previous.epiweek),
+  travellers %>%
+    dplyr::filter(EpiweekCreated == two.epiweeks.ago)
+) %>%
+  dplyr::mutate(Gender = as.factor(Gender)) %>%
+  dplyr::group_by(CountryGroup) %>%
+  dplyr::summarise(
+    Total_Travellers = dplyr::n(),
+    Average_Age = round(mean(AgeAtPositiveResult, na.rm = T), 0),
+    Min_Age = min(AgeAtPositiveResult, na.rm = T),
+    Max_Age = max(AgeAtPositiveResult, na.rm = T),
+    MaleCases = sum(Gender == "Male", na.rm = T),
+    FemaleCases = sum(Gender == "Female", na.rm = T)
+  ) %>%
+  tidyr::unite(Age_Range, c(Min_Age, Max_Age), sep = "-") %>%
+  dplyr::arrange(desc(Total_Travellers)) %>%
+  tidyr::drop_na(CountryGroup) %>%
+  dplyr::rename(
+    "Country Visited" = CountryGroup,
+    "Total Travellers (n)" = Total_Travellers,
+    "Age Range" = Age_Range,
+    "Average Age (Years)" = Average_Age,
+    "Male Cases" = MaleCases,
+    "Female Cases" = FemaleCases
+  )
+
+
+DT::datatable(
+  FortTravellersAllDF,
+  filter = "top",
+  extensions = c('Buttons'),
+  options = list(
+    searchCols = NULL,
+    lengthMenu = c(5, 10, 20, 50, 100),
+    dom = 'lBftrip',
+    pageLength = 10,
+    scrollY = "",
+    scrollX = T,
+    buttons = list(
+      list(
+        extend = 'csv',
+        filename = paste0(Sys.Date(), "traveller_report_table")
+      ),
+      list(
+        extend = 'excel',
+        filename = paste0(Sys.Date(), "traveller_report_table")
+      )
+    )
+  )
+)
+```
+
+# Report Tables (One Week)
+
+### All cases from Monday 00:00 on `r format(lubridate::floor_date(lubridate::today()-6, "week")+1, "%d-%m-%Y")` to the most recent Sunday 23:59.
+
+```{r}
+WeekTravellersAllDF <- travellers %>%
+  dplyr::filter(EpiweekCreated == previous.epiweek) %>%
+  dplyr::mutate(Gender = as.factor(Gender)) %>%
+  dplyr::group_by(CountryGroup) %>%
+  dplyr::summarise(
+    Total_Travellers = dplyr::n(),
+    Average_Age = round(mean(AgeAtPositiveResult, na.rm = T), 0),
+    Min_Age = min(AgeAtPositiveResult, na.rm = T),
+    Max_Age = max(AgeAtPositiveResult, na.rm = T),
+    MaleCases = sum(Gender == "Male", na.rm = T),
+    FemaleCases = sum(Gender == "Female", na.rm = T)
+  ) %>%
+  tidyr::unite(Age_Range, c(Min_Age, Max_Age), sep = "-") %>%
+  dplyr::arrange(desc(Total_Travellers)) %>%
+  tidyr::drop_na(CountryGroup) %>%
+  dplyr::rename(
+    "Country Visited" = CountryGroup,
+    "Total Travellers (n)" = Total_Travellers,
+    "Age Range" = Age_Range,
+    "Average Age (Years)" = Average_Age,
+    "Male Cases" = MaleCases,
+    "Female Cases" = FemaleCases
+  )
+
+
+DT::datatable(
+  WeekTravellersAllDF,
+  filter = "top",
+  extensions = c('Buttons'),
+  options = list(
+    searchCols = NULL,
+    lengthMenu = c(5, 10, 20, 50, 100),
+    dom = 'lBftrip',
+    pageLength = 10,
+    scrollY = "",
+    scrollX = T,
+    buttons = list(
+      list(
+        extend = 'csv',
+        filename = paste0(Sys.Date(), "traveller_report_table")
+      ),
+      list(
+        extend = 'excel',
+        filename = paste0(Sys.Date(), "traveller_report_table")
+      )
+    )
+  )
+)
 ```
