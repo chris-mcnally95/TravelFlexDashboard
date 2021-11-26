@@ -980,16 +980,16 @@ Row
 
 ### 
 ```{r}
-flexdashboard::valueBox(value = totalcasesall,
-                        caption = paste("Total Reported Cases as of ", format(Sys.Date()-1, "%d-%m-%Y"), "Successful cases: ", totalcasessucc),
+flexdashboard::valueBox(value = totalcasessucc,
+                        caption = paste0("Total Successful Reported Cases as of ", format(Sys.Date()-1, "%d-%m-%Y"), ". Unsuccessful cases included: ", totalcasesall),
                         icon = "ion-android-clipboard", 
                         color ="cornflowerblue")
 ```
 
 ### 
 ```{r}
-flexdashboard::valueBox(value = FortCasesAll,
-                        caption = paste("Reported Cases Within Previous Two epiweeks. Successful cases: ", FortCasesAllSucc),
+flexdashboard::valueBox(value = FortCasesAllSucc,
+                        caption = paste("Reported Successful Cases Within Previous Two epiweeks. Unsuccessful cases included: ", FortCasesAll),
                         icon = "ion-android-clipboard", 
                         color ="cornflowerblue")
 ```
@@ -1057,7 +1057,7 @@ Row
 ### 
 ```{r}
 flexdashboard::valueBox(value = totalNontravellercases,
-                        caption = paste("Total Non-Travel Related Cases as of ", format(Sys.Date()-1, "%d-%m-%Y")),
+                        caption = paste("Total Successful Non-Travel Related Cases as of ", format(Sys.Date()-1, "%d-%m-%Y")),
                         icon = "ion-document-text", 
                         color ="cornflowerblue")
 ```
@@ -1065,12 +1065,12 @@ flexdashboard::valueBox(value = totalNontravellercases,
 ### 
 ```{r}
 flexdashboard::valueBox(value = FortNonTravellers,
-                        caption = paste("Reported Non-Travel Related Cases in the Previous Two Epiweeks"),
+                        caption = paste("Reported Successful Non-Travel Related Cases in the Previous Two Epiweeks"),
                         icon = "ion-document-text", 
                         color ="cornflowerblue")
 ``` 
 
-# Report Tables (Two Weeks)
+# Report Tables (Previous Two Weeks)
 
 ### All cases from Monday 00:00 on `r format(lubridate::floor_date(lubridate::today()-13, "week")+1, "%d-%m-%Y")` to the most recent Sunday 23:59.
 
@@ -1129,13 +1129,68 @@ DT::datatable(
 )
 ```
 
-# Report Tables (One Week)
+# Report Tables (One Epiweek Ago)
 
-### All cases from Monday 00:00 on `r format(lubridate::floor_date(lubridate::today()-6, "week")+1, "%d-%m-%Y")` to the most recent Sunday 23:59.
+### All cases from Monday 00:00 on `r format(lubridate::floor_date(lubridate::today()-6, "week")+1, "%d-%m-%Y")` to 23:59 on Sunday `r format(lubridate::floor_date(lubridate::today(), "week"), "%d-%m-%Y")`.
 
 ```{r}
 WeekTravellersAllDF <- travellers %>%
   dplyr::filter(EpiweekCreated == previous.epiweek) %>%
+  dplyr::mutate(Gender = as.factor(Gender)) %>%
+  dplyr::group_by(CountryGroup) %>%
+  dplyr::summarise(
+    Total_Travellers = dplyr::n(),
+    Average_Age = round(mean(AgeAtPositiveResult, na.rm = T), 0),
+    Min_Age = min(AgeAtPositiveResult, na.rm = T),
+    Max_Age = max(AgeAtPositiveResult, na.rm = T),
+    MaleCases = sum(Gender == "Male", na.rm = T),
+    FemaleCases = sum(Gender == "Female", na.rm = T)
+  ) %>%
+  tidyr::unite(Age_Range, c(Min_Age, Max_Age), sep = "-") %>%
+  dplyr::arrange(desc(Total_Travellers)) %>%
+  tidyr::drop_na(CountryGroup) %>%
+  dplyr::rename(
+    "Country Visited" = CountryGroup,
+    "Total Travellers (n)" = Total_Travellers,
+    "Age Range" = Age_Range,
+    "Average Age (Years)" = Average_Age,
+    "Male Cases" = MaleCases,
+    "Female Cases" = FemaleCases
+  )
+
+
+DT::datatable(
+  WeekTravellersAllDF,
+  filter = "top",
+  extensions = c('Buttons'),
+  options = list(
+    searchCols = NULL,
+    lengthMenu = c(5, 10, 20, 50, 100),
+    dom = 'lBftrip',
+    pageLength = 10,
+    scrollY = "",
+    scrollX = T,
+    buttons = list(
+      list(
+        extend = 'csv',
+        filename = paste0(Sys.Date(), "traveller_report_table")
+      ),
+      list(
+        extend = 'excel',
+        filename = paste0(Sys.Date(), "traveller_report_table")
+      )
+    )
+  )
+)
+```
+
+# Report Tables (Two Epiweeks Ago)
+
+### All cases from Monday 00:00 on `r format(lubridate::floor_date(lubridate::today()-13, "week")+1, "%d-%m-%Y")` to 23:59 on Sunday `r format(lubridate::floor_date(lubridate::today()-7, "week"), "%d-%m-%Y")`.
+
+```{r}
+WeekTravellersAllDF <- travellers %>%
+  dplyr::filter(EpiweekCreated == two.epiweeks.ago) %>%
   dplyr::mutate(Gender = as.factor(Gender)) %>%
   dplyr::group_by(CountryGroup) %>%
   dplyr::summarise(
